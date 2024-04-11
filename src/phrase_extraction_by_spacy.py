@@ -1,25 +1,19 @@
 import spacy
-from typing import List
+from typing import List, Tuple
+import make_corpus_from_dataset
 
-def noun_phrases_extraction_by_spacy(text: str) -> List[str]:
-    nlp: spacy.language = spacy.load('ja_ginza')
-
-    doc = nlp(text)
+def noun_phrases_extraction_by_spacy(doc) -> List[str]:
 
     # 名詞句の抽出　あまりに短い文章だと精度が落ちるかも
     noun_list = []
     for chunk in doc.noun_chunks:
         print(chunk.text)
         noun_list.append(chunk.text)
-        # 抽出された名詞句を原文から削除
-        # text = text.replace(chunk.text, '')
 
     print(noun_list)
-    return noun_list, text
+    return noun_list
 
-def verb_phrases_extract_by_spacy(text: str) -> List[str]:
-    nlp = spacy.load('ja_ginza')
-    doc = nlp(text)
+def verb_phrases_extract_by_spacy(doc) -> List[str]:
 
     verb_phrases = []
     for token in doc:
@@ -39,15 +33,11 @@ def verb_phrases_extract_by_spacy(text: str) -> List[str]:
                     verb_phrase.append(child.text)
 
             verb_phrases.append(''.join(verb_phrase))
-            # 抽出された動詞句を原文から削除
-            # text = text.replace(verb_phrase, '')
             
     print(verb_phrases)
-    return verb_phrases, text
+    return verb_phrases
 
-def adj_phrases_extraction_by_spacy(text: str) -> List[str]:
-    nlp = spacy.load('ja_ginza')
-    doc = nlp(text)
+def adj_phrases_extraction_by_spacy(doc) -> List[str]:
 
     adj_phrases = []
     for token in doc:
@@ -70,7 +60,7 @@ def adj_phrases_extraction_by_spacy(text: str) -> List[str]:
             if (token_tag == '動詞') and (next_token_tag_sub == '形容詞的'):
                 adj_phrases.append(token.text + next_token.text)
             # 単体の形容詞
-            if (token_tag == '形容詞'):
+            if token_tag == '形容詞':
                 adj_phrases.append(token.text)
 
         if prev_token is not None:
@@ -83,8 +73,23 @@ def adj_phrases_extraction_by_spacy(text: str) -> List[str]:
     return adj_phrases
 
 
-input_text = '彼女は毎朝熱いコーヒーを飲む'
-noun_phrases_extraction_by_spacy(input_text)
-adj_phrases_extraction_by_spacy(input_text)
-verb_phrases_extract_by_spacy(input_text)
+def main():
+    nlp = spacy.load('ja_ginza')
+    # 100万文字以上は以下の設定をする必要あり
+    nlp.max_length = 1500000
+    text = make_corpus_from_dataset.return_livedoor_text('https://www.rondhuit.com/download/ldcc-20140209.tar.gz',
+                                                        'ldcc-20140209.tar.gz')
+    input_text = '彼女は毎朝熱いコーヒーを飲む'
+    doc = nlp(text)
+    doc2 = nlp(input_text)
 
+    noun_phrases_extraction_by_spacy(doc2)
+    adj_phrases_extraction_by_spacy(doc2)
+    verb_phrases_extract_by_spacy(doc2)
+
+    noun_phrases_extraction_by_spacy(doc)
+    adj_phrases_extraction_by_spacy(doc)
+    verb_phrases_extract_by_spacy(doc)
+
+if __name__ == "__main__":
+    main()
