@@ -9,8 +9,6 @@ with open('../data/dblp.win5.pickle.gz', 'rb')as f:
   # グラフ数の取得
   lens = len(all_graphs)
 
-
-
 G = all_graphs[0]  # 最初のグラフを取得
 print(nx.number_of_nodes(G))
 print(nx.number_of_edges(G))
