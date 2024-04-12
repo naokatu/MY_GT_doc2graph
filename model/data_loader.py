@@ -112,6 +112,9 @@ def get_vocab(train_graphs: list, val_graphs: list, pretrained_vec: torchtext.vo
         counter['<eos>'] = 1
     for G in train_graphs:
         for n in G.nodes():
+            if n is None:
+                continue
+            print(n)
             for word in n.split(' '):
                 if word in counter:
                     counter[word] += 1
@@ -146,7 +149,7 @@ def split_train_val_test(all_data_path: str) -> tuple:
 
 
 def prepare_ingredients(pickle_path: str, corpus_type: str,
-                        pretrain_name: str = 'glove.840B.300d.txt',
+                        pretrain_name: str = 'model.vec',
                         emb_cache: str = None,
                         max_vectors: int = 160000,
                         yelp_senti_feature: bool = False,
@@ -174,7 +177,9 @@ def prepare_ingredients(pickle_path: str, corpus_type: str,
 if __name__ == '__main__':
     dblp_pickle_path = 'data/dblp.win5.pickle.gz'
     # prepare_ingredients(dblp_pickle_path)
-    nyt_pickle_path = 'data/nyt.win5.pickle.gz'
+    # nyt_pickle_path = 'data/nyt.win5.pickle.gz'
+    nyt_pickle_path = 'data/livedoor.win5.pickle.gz'
     random.seed(27)
-    train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'nyt')
+    # train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'nyt')
+    train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'ja')
     print(test_set.docids[:20])
