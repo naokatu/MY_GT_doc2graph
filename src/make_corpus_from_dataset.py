@@ -24,7 +24,7 @@ def return_aozora_text(url: str, filename: str, start_row:int, end_row:int) -> s
 
     return text
 
-# {'IT': ['1個目のファイルの文字列', '2個目のファイルの文字列', 'FFF'], 'daily': ['ccc', 'ddd']}を返す
+# {'IT': ['1個目のファイルの文字列', '2個目のファイルの文字列', ], 'daily': ['ccc', 'ddd']}を返す
 def return_livedoor_text(url: str, filename: str) -> Dict[str, List[Any]]:
     urllib.request.urlretrieve(url, filename)
     with tarfile.open('./' + filename, 'r:gz') as tar:
@@ -57,7 +57,3 @@ def return_livedoor_text(url: str, filename: str) -> Dict[str, List[Any]]:
             text_li[target_dir].append(content)
 
         return text_li
-
-text = return_livedoor_text('https://www.rondhuit.com/download/ldcc-20140209.tar.gz',
-                                                        'ldcc-20140209.tar.gz')
-print(text)
