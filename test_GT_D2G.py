@@ -50,7 +50,8 @@ def test_model(config_path, checkpoint_path, gumbel_tau, _run, _log):
     th.manual_seed(opt['seed'])
     n_labels = opt['n_labels'][opt['corpus_type']]
     # recover newly added params
-    pretrain_emb_name = opt.get('pretrain_emb_name', 'glove.840B.300d.txt')
+    # pretrain_emb_name = opt.get('pretrain_emb_name', 'glove.840B.300d.txt')
+    pretrain_emb_name = opt.get('pretrain_emb_name', 'model.vec')
     pretrain_emb_cache = opt.get('pretrain_emb_cache', None)
     pretrain_emb_max_vectors = opt.get('pretrain_emb_max_vectors', 160000)
     gcn_encoder_pooling = opt.get('gcn_encoder_pooling', 'mean')
