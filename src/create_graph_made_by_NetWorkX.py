@@ -51,10 +51,10 @@ def show_NetWorkX_graph(graph):
     plt.axis("off")
     plt.show()
 
-def write_pickle(G_li):
+def write_pickle(graphs):
     # 名前は.gzだが、実際は圧縮されていないので注意
     with open('livedoor.win5.pickle.gz', 'wb') as f:
-      pickle.dump(G_li, f)
+      pickle.dump(graphs, f)
 
 
 def main():
@@ -63,15 +63,15 @@ def main():
     nlp.max_length = 1500000
     text = make_corpus_from_dataset.return_livedoor_text('https://www.rondhuit.com/download/ldcc-20140209.tar.gz',
                                                         'ldcc-20140209.tar.gz')
-    G_li = []
+    graph_li = []
     for category in text.values():
         for index, content in enumerate(category):
             doc = nlp(content)
             # doc.sentsは1文ずつのオブジェクト
             file_init_graph = create_initial_graph(list(doc.sents))
-            G_li.append(file_init_graph)
+            graph_li.append(file_init_graph)
     
-    write_pickle(G_li)
+    write_pickle(graph_li)
 
 if __name__ == "__main__":
     main()
