@@ -44,6 +44,8 @@ class DocClassificationDataset(Dataset):
             for idx, n in enumerate(nxg.nodes()):
                 nid_mapping[n] = idx
                 freqs.append(nxg.nodes[n]['freq'])
+                print(f'nodes = {nxg.nodes}')
+                print(f'nodes[n] = {nxg.nodes[n]} freq = {nxg.nodes[n]["freq"]}')
                 loc_f.append(min([_[0] for _ in nxg.nodes[n]['offsets']]))
                 loc_l.append(max([_[1] for _ in nxg.nodes[n]['offsets']]))
                 for i, t in enumerate(n.split(' ')):

@@ -1,4 +1,4 @@
-#!/bin/bash
+# !/bin/bash
 
 # ** GT-D2G-var **
 # Reproduce NYT Result

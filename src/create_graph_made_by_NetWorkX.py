@@ -6,13 +6,19 @@ import more_itertools
 import spacy
 import networkx as nx
 import matplotlib.pyplot as plt
+import random
 import japanize_matplotlib
 
 import make_corpus_from_dataset
 import phrase_extraction_by_spacy
 
-def create_initial_graph(sentences, window_size: int = 4) -> nx.Graph:
+def create_initial_graph(index, sentences, window_size: int = 4) -> nx.Graph:
     G = nx.Graph()
+
+
+    G.graph['docid'] = index
+    G.graph['class'] = random.randint(0, 4)
+
     print(len(sentences))
     nodes = []
     for sentence in sentences:
@@ -32,10 +38,9 @@ def create_initial_graph(sentences, window_size: int = 4) -> nx.Graph:
             # すべての組み合わせでエッジ接続
             for window in sliding_window_list:
                 for comb_nodes in itertools.combinations(window, 2):
+                    # Noneの場合はエッジ接続しない
                     if comb_nodes[0] is not None and comb_nodes[1] is not None:
                         G.add_edge(comb_nodes[0],comb_nodes[1])
-                    else:
-                       print(comb_nodes)
                     
     return G
 
@@ -53,7 +58,7 @@ def show_NetWorkX_graph(graph):
 
 def write_pickle(graphs):
     # 名前は.gzだが、実際は圧縮されていないので注意
-    with open('livedoor.win5.pickle.gz', 'wb') as f:
+    with open('../data/livedoor.win5.pickle.gz', 'wb') as f:
       pickle.dump(graphs, f)
 
 
@@ -68,7 +73,7 @@ def main():
         for index, content in enumerate(category):
             doc = nlp(content)
             # doc.sentsは1文ずつのオブジェクト
-            file_init_graph = create_initial_graph(list(doc.sents))
+            file_init_graph = create_initial_graph(index, list(doc.sents))
             graph_li.append(file_init_graph)
     
     write_pickle(graph_li)
