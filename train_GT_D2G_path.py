@@ -122,8 +122,10 @@ def train_model(opt, _run, _log):
     gcn_classifier = GraphClassifier(opt['gcn_encoder_hidden_size'], opt['gcn_classifier_hidden_size'],
                                      n_labels)
     class_criterion = nn.CrossEntropyLoss()
+    # 更新パラメータ
     parameters = list(gcn_encoder.parameters()) + list(gptrnn_decoder.parameters()) \
         + list(gcn_classifier.parameters())
+    # 最適化手法：Adam lrは学習率
     optimizer = th.optim.Adam(parameters, opt['lr'], weight_decay=opt['optimizer_weight_decay'])
     scheduler = th.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt['lr_scheduler_cosine_T_max'])
     if opt['resume_checkpoint_path']:
