@@ -86,18 +86,23 @@ def train_model(opt, _run, _log):
     if not opt['corpus_type'] or not opt['processed_pickle_path'] or not opt['checkpoint_dir']:
         _log.error('missing essential input arguments')
         exit(-1)
+
+    # カテゴリー（ラベル）の数　opt["n_labels"]: {'nyt': 5, 'yelp': 5, 'yelp-3-class': 3, 'dblp': 6}
     n_labels = opt['n_labels'][opt['corpus_type']]
+
     lambda_cov_loss = opt['lambda_cov_loss']
 
     # Load corpus
     batch_size = opt['batch_size']
     pickle_path = opt['processed_pickle_path']
     _log.info('[%s] Start loading %s corpus from %s' % (time.ctime(), opt['corpus_type'], pickle_path))
+    # vocabはtorchtext.vocab.Vocabで生成されたもの。他はDocClassificationDataset
     train_set, val_set, test_set, vocab = prepare_ingredients(pickle_path, corpus_type=opt['corpus_type'],
                                                               pretrain_name=opt['pretrain_emb_name'],
                                                               emb_cache=opt['pretrain_emb_cache'],
                                                               max_vectors=opt['pretrain_emb_max_vectors'],
                                                               yelp_senti_feature=opt['yelp_senti_feat'])
+    # 不明
     train_iter = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     val_iter = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     _log.info('[%s] Load train, val, test sets Done, len=%d,%d,%d' % (time.ctime(),

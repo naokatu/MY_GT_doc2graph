@@ -45,7 +45,8 @@ class DocClassificationDataset(Dataset):
                 nid_mapping[n] = idx
                 freqs.append(nxg.nodes[n]['freq'])
                 print(f'nodes = {nxg.nodes}')
-                print(f'nodes[n] = {nxg.nodes[n]} freq = {nxg.nodes[n]["freq"]}')
+                print(f'nodes[n] = {nxg.nodes[n]}')
+                print(f'n = {n}')
                 loc_f.append(min([_[0] for _ in nxg.nodes[n]['offsets']]))
                 loc_l.append(max([_[1] for _ in nxg.nodes[n]['offsets']]))
                 for i, t in enumerate(n.split(' ')):
@@ -151,7 +152,7 @@ def split_train_val_test(all_data_path: str) -> tuple:
 
 
 def prepare_ingredients(pickle_path: str, corpus_type: str,
-                        pretrain_name: str = 'model.vec',
+                        pretrain_name: str = 'glove.840B.300d.txt',
                         emb_cache: str = None,
                         max_vectors: int = 160000,
                         yelp_senti_feature: bool = False,
