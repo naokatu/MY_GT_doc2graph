@@ -63,6 +63,7 @@ class GCNEncoder(nn.Module):
         super(GCNEncoder, self).__init__()
         self.yelp_senti_feat = yelp_senti_feat
         self.pretrained_emb_dropout = pretrained_emb_dropout
+        # 単語埋め込みを使用してnn.Embedding（各単語のインデックスに意味を持たせるベクトル）を初期化
         self.word_emb = nn.Embedding.from_pretrained(pretrained_emb, padding_idx=1)
         if self.yelp_senti_feat:
             sentiment_level = 3    # currently fix
@@ -72,22 +73,26 @@ class GCNEncoder(nn.Module):
             GCN_in_size += (2 * ee_dim)
         if self.pretrained_emb_dropout > 0.0:
             self.dropout = nn.Dropout(pretrained_emb_dropout)
+        # グラフ畳み込み層の初期化　GCN_in_size→GCN_hidden_size GCN_hidden_size→GCN_hidden_size
         self.conv1 = GraphConv(GCN_in_size, GCN_hidden_size, allow_zero_in_degree=True)
         self.conv2 = GraphConv(GCN_hidden_size, GCN_hidden_size, allow_zero_in_degree=True)
-        if pooling == 'mean':
+        # 指定されたプーリング方法に基づいてプーリング層を初期化　初期値は平均プーリング
+        if pooling == 'mean': # 平均プーリング
             self.pooling = AvgPooling()
         elif pooling == 'global_attention':
             pooling_gate_nn = nn.Linear(GCN_hidden_size, 1)
-            self.pooling = GlobalAttentionPooling(pooling_gate_nn)
+            self.pooling = GlobalAttentionPooling(pooling_gate_nn) # グローバル注意プーリング
         else:
             print('pooling is invalid!!')
             exit(-1)
-
+    
+    # 単語埋め込みの計算
     def forward(self, g: dgl.DGLGraph) -> tuple:
         word_embs = self.word_emb(g.ndata['p'])   # nnodes*mention_l*emb_s
         word_embs = th.div(th.sum(word_embs, dim=1), g.ndata['ml'].unsqueeze(1))   # nnodes*emb_s
         if self.pretrained_emb_dropout:
             word_embs = self.dropout(word_embs)
+        # 単語埋め込みとノード特徴量の連結　ノードのテキスト情報をベクトルに組み込める
         if not self.yelp_senti_feat:
             h = th.cat((word_embs, g.ndata['f'].unsqueeze(1),
                         g.ndata['lf'].unsqueeze(1), g.ndata['ll'].unsqueeze(1)), 1)  # nnodes*(emb_s+3)
@@ -96,6 +101,7 @@ class GCNEncoder(nn.Module):
             neg_embs = self.neg_ee(g.ndata['neg'])   # nnodes*ee_dim
             h = th.cat((word_embs, g.ndata['f'].unsqueeze(1), g.ndata['lf'].unsqueeze(1),
                         g.ndata['ll'].unsqueeze(1), pos_embs, neg_embs), 1)  # nnodes*(emb_s+3+2*ee_dim)
+        
         h = F.relu(self.conv1(g, h))     # nnodes*gcn_h
         h = F.relu(self.conv2(g, h))     # nnodes*gcn_h
         hg = self.pooling(g, h)    # batch*gcn_h
@@ -375,15 +381,20 @@ class GPTGRNNDecoder(nn.Module):
         self.graph_rnn_num_layers = graph_rnn_num_layers
         self.edge_rnn_num_layers = edge_rnn_num_layers
         self.tau = tau
+        # エンコーダの隠れ状態をグラフRNNの隠れ状態のサイズに投影する全結合層
         self.gcn_emb_projector = nn.Linear(encoder_hidden_size, graph_rnn_num_layers*self.hidden_size)
+        #  グラフ構造を生成するためのGRU層
         self.graph_gru = nn.GRU(self.input_size, self.hidden_size, graph_rnn_num_layers,
                                 batch_first=True, dropout=p_dropout)
+        # エンコーダの出力に対してアテンションを計算するためのAttentionモジュール
         self.attention = Attention(self.hidden_size, attention_units)
-        # need a linear layer to map dimension
+        # need a linear layer to map dimension　グラフRNNの隠れ状態をエッジRNNの隠れ状態のサイズに投影する全結合層
         self.graph_edge_projector = nn.Linear(graph_rnn_num_layers*self.hidden_size,
                                               edge_rnn_num_layers*edge_rnn_hidden_size)
+        # エッジの存在確率を生成するためのGRU層
         self.edge_gru = nn.GRU(1, edge_rnn_hidden_size, edge_rnn_num_layers,
                                batch_first=True)
+        # エッジRNNの出力からエッジの存在確率を計算するための全結合層とシグモイド関数
         self.fout = nn.Sequential(
                 nn.Linear(edge_rnn_hidden_size, edge_rnn_hidden_size // 2),
                 nn.ReLU(),
@@ -394,58 +405,79 @@ class GPTGRNNDecoder(nn.Module):
     def forward(self, g: dgl.DGLGraph, h: th.Tensor, hg: th.Tensor) -> tuple:
         # h:  nnodes * hidden_s
         # hg: batch * hidden_s
-        pointer_argmaxs = []  # store generated sequences
-        adj_vecs = []         # store generated adj_vecs
-        pseduo_seqs = []   # regard nodes of graph as a sequence
+        pointer_argmaxs = []  # store generated sequences 生成されたノードのインデックスを格納するリスト
+        adj_vecs = []         # store generated adj_vecs　生成されたエッジの存在確率を表すリスト（テンソル）
+        pseduo_seqs = []   # regard nodes of graph as a sequence　グラフのノードを疑似的なシーケンスとして扱うためのリスト、各グラフのノード特徴量を格納する
         nidx = 0
         # TODO: consider other pseudo sequence
+        # バッチ内の各グラフのノード数を取得→ノード特徴量を格納
         for nnode in g.batch_num_nodes():
             pseduo_seqs.append(h[nidx:nidx+nnode, :])
             nidx += nnode
+        # シーケンスの長さに基づいてマスクを生成　シーケンスの有効な部分を1，パディングされた部分を0とする
+        # マスクはAttension機構、損失関数の計算において有効な部分だけを使用するために使われる
         mask = get_mask_from_sequence_lengths(g.batch_num_nodes(), g.batch_num_nodes().max())
+        # パディングを追加 エンコーダの出力（デコーダの入力）を取得
         encoder_out = pad_sequence(pseduo_seqs, batch_first=True)  # batch*max_nnode*hi
         batch_size = encoder_out.shape[0]
-
         decoder_input = encoder_out.new_zeros((batch_size, self.input_size)).unsqueeze(1)   # batch*1*input
+        # グラフ全体の特徴量hgをデコーダの隠れ状態のサイズに変換し、ReLU活性化関数を適用
         decoder_hidden = self.gcn_emb_projector(hg).view(batch_size, self.graph_rnn_num_layers, self.hidden_size).relu()
         decoder_hidden = decoder_hidden.transpose(0, 1).contiguous()  # num_layer*batch*hidden
+        # カバレッジベクトルの初期化
         cov_vec = encoder_out.new_zeros((batch_size, encoder_out.shape[1]))    # batch*max_nnode
+        # カバレッジ損失の初期化　カバレッジベクトルの合計値
         cov_loss = cov_vec.sum()
+    
         for i in range(self.max_out_node_size):
+            # GRUで次の隠れ状態と出力を計算
             output, decoder_hidden = self.graph_gru(decoder_input, decoder_hidden)
             # output: batch * seq_len(=1) * hidden
             # decoder_hidden: num_layer * batch * hidden_size
+            # アテンションスコアを計算
             att_scores = self.attention(encoder_out, output.squeeze(1), cov_vec, mask)
             # decode node
+            # カバレッジ損失の計算
             cov_loss += th.minimum(att_scores, cov_vec).sum()
             cov_vec = cov_vec + att_scores
+            # アテンションスコアに基づいて次のノードを選択するための確率分布を計算 tauは温度パラメータ hard=trueでone-hotベクトル表現になる
             att_argmax = F.gumbel_softmax((att_scores + 1e-12).log(),
                                           tau=self.tau, hard=True, dim=1)   # batch*max_nnode
+            # 選択されたノードに対するエンコーダの出力を抽出　ノードの埋め込みを取得
             chosen_node_emb = th.matmul(encoder_out.transpose(1, 2),
                                         att_argmax.unsqueeze(-1)).squeeze(-1)  # batch*hidden
             pointer_argmaxs.append(att_argmax)
             # decode adj vector
+            # エッジ生成
             theta = []
+            # エッジRNNの隠れ状態の形に変換
             edge_hn = self.graph_edge_projector(decoder_hidden.transpose(0, 1).reshape(batch_size, -1)).relu()
             # edge_hn:batch*(edge_layer*edge_hidden)
             edge_hn = edge_hn.view(batch_size, self.edge_rnn_num_layers,
                                    self.edge_hidden_size).transpose(0, 1).contiguous()
             # edge_hn:edge_layer*batch*edge_hidden
+            # エッジRNNの初期入力
             edge_input = encoder_out.new_zeros((batch_size, 1, 1))  # batch*seq_len(=1)*input(=1)
+            # 選択した各ノードに対してエッジを予測
             for j in range(i):
                 edge_output, edge_hn = self.edge_gru(edge_input, edge_hn)
                 # edge_output: batch*seq_len(=1)*edge_hidden
                 edge_input = self.fout(edge_output.squeeze(1))   # batch*1
+                # 予測されたエッジの存在確率を追加
                 theta.append(edge_input)
                 edge_input = edge_input.unsqueeze(1)
+            # 現在のノードとまだ生成されていないノードのエッジの存在確率を0にする
             for j in range(self.max_out_node_size-1-i):
                 theta.append(encoder_out.new_zeros(batch_size, 1))
+            # thetaリストの要素を連結することで現在のノードiと他の全てのノードとのエッジの存在確率が表現される
             theta = th.cat(theta, dim=1)  # batch*max_out
             adj_vecs.append(theta)
+            # 選択されたノードの埋め込みと予測されたエッジの存在確率を連結することで新しいデコーダ入力を作成
             decoder_input = th.cat((chosen_node_emb, theta), dim=1)    # batch*input
             decoder_input = decoder_input.unsqueeze(1)    # batch*seq_len(=1)*input
         # pointer_argmaxs: batch*max_nnode*max_seq_len, cov_loss: scalar
         # encoder_out: batch*max_nnode*hidden, adj_vecs:batch*max_seq-1*max_seq_len
+        # カバレッジ損失をバッチサイズで割って正規化
         cov_loss = cov_loss / batch_size
         return th.stack(pointer_argmaxs, dim=2), cov_loss, encoder_out, th.stack(adj_vecs, dim=2)
 

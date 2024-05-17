@@ -18,7 +18,48 @@ from utils import convert_adj_vec_to_matrix
 from model.data_loader import prepare_ingredients, collate_fn
 from model.GPT_GRNN import GCNEncoder, GPTGRNNDecoder, GraphClassifier
 
-
+'''
+motivation: 実験の動機や目的を説明する文字列。
+gpu: GPUを使用するかどうかを指定するブール値。
+seed: 乱数シードを指定する整数値。
+corpus_type: 使用するコーパスの種類を指定する文字列（'yelp'、'dblp'、'nyt'のいずれか）。
+processed_pickle_path: 前処理済みのデータセットのパスを指定する文字列。
+checkpoint_dir: モデルのチェックポイントを保存するディレクトリを指定する文字列。
+n_labels: コーパスごとのラベルの数を指定する辞書。
+epoch: 訓練のエポック数を指定する整数値。
+epoch_warmup: ウォームアップ期間のエポック数を指定する整数値。
+early_stop_flag: アーリーストッピングを使用するかどうかを指定するブール値。
+patience: アーリーストッピングのためのパシェンス（改善が見られない連続エポック数）を指定する整数値。
+batch_size: バッチサイズを指定する整数値。
+lr: 学習率を指定する浮動小数点数。
+lr_scheduler_cosine_T_max: CosineAnnealingLRスケジューラのT_maxパラメータを指定する整数値。
+optimizer_weight_decay: オプティマイザの重み減衰率を指定する浮動小数点数。
+lambda_cov_loss: カバレッジ損失の重みを指定する浮動小数点数。
+shrinkage_lambda_cov_per_epoch: カバレッジ損失の重みを減衰させるエポック数を指定する整数値。
+shrinkage_rate_lambda_cov: カバレッジ損失の重みの減衰率を指定する浮動小数点数。
+clip_grad_norm: 勾配クリッピングのノルムを指定する浮動小数点数。
+gptrnn_decoder_dropout: GPT-GRNNデコーダのドロップアウト率を指定する浮動小数点数。
+gcn_encoder_hidden_size: GCNエンコーダの隠れ層のサイズを指定する整数値。
+gcn_encoder_pooling: GCNエンコーダのプーリング方法を指定する文字列。
+graph_rnn_num_layers: グラフRNNの層数を指定する整数値。
+graph_rnn_hidden_size: グラフRNNの隠れ層のサイズを指定する整数値。
+edge_rnn_num_layers: エッジRNNの層数を指定する整数値。
+edge_rnn_hidden_size: エッジRNNの隠れ層のサイズを指定する整数値。
+GPT_attention_unit: GPTのアテンションユニット数を指定する整数値。
+max_out_node_size: 生成するグラフの最大ノード数を指定する整数値。
+gumbel_tau: Gumbel-Softmaxのための温度パラメータの初期値を指定する浮動小数点数。
+gumbel_tau_min: Gumbel-Softmaxの温度パラメータの最小値を指定する浮動小数点数。
+gumbel_tau_decay: Gumbel-Softmaxの温度パラメータの減衰率を指定する浮動小数点数。
+gpt_grnn_variant: GPT-GRNNのバリアントを指定する文字列。
+gcn_classifier_hidden_size: GCN分類器の隠れ層のサイズを指定する整数値。
+pretrain_emb_name: 事前学習された単語埋め込みのファイル名を指定する文字列。
+pretrain_emb_cache: 事前学習された単語埋め込みのキャッシュファイルのパスを指定する文字列。
+pretrain_emb_max_vectors: 事前学習された単語埋め込みから読み込むベクトルの最大数を指定する整数値。
+yelp_senti_feat: Yelpデータセットでセンチメント特徴を使用するかどうかを指定するブール値。
+pretrain_emb_dropout: 事前学習された単語埋め込みに対するドロップアウト率を指定する浮動小数点数。
+regular_loss_decay: 正則化損失の減衰率を指定する浮動小数点数。
+resume_checkpoint_path: 再開するチェックポイントのパスを指定する文字列。
+'''
 # Sacred Setup
 ex = sacred.Experiment('train_GT-D2G-path')
 ex.observers.append(FileStorageObserver("logs/GT-D2G-path"))
@@ -102,13 +143,14 @@ def train_model(opt, _run, _log):
                                                               emb_cache=opt['pretrain_emb_cache'],
                                                               max_vectors=opt['pretrain_emb_max_vectors'],
                                                               yelp_senti_feature=opt['yelp_senti_feat'])
-    # 不明
+    # Pytorchのデータローダクラスを使用して、訓練データセットと検証データセットからバッチを生成する（ミニバッチ学習のために）
+    # shuffleはデータセットをランダムに抽出してくれて、collate_fnはデータセットの各サンプルが異なる構造の時にデータ構造を一致させるためにある
     train_iter = DataLoader(train_set, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     val_iter = DataLoader(val_set, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
     _log.info('[%s] Load train, val, test sets Done, len=%d,%d,%d' % (time.ctime(),
               len(train_set), len(val_set), len(test_set)))
 
-    # Build models
+    # 事前学習された埋め込みを使用してモデルを初期化
     pretrained_emb = vocab.vectors
     gcn_encoder = GCNEncoder(pretrained_emb, pretrained_emb.shape[1]+3, opt['gcn_encoder_hidden_size'],
                              opt['gcn_encoder_pooling'], opt['yelp_senti_feat'],
@@ -125,9 +167,10 @@ def train_model(opt, _run, _log):
     # 更新パラメータ
     parameters = list(gcn_encoder.parameters()) + list(gptrnn_decoder.parameters()) \
         + list(gcn_classifier.parameters())
-    # 最適化手法：Adam lrは学習率
+    # 最適化手法：Adam 学習率のスケジューリング：lr
     optimizer = th.optim.Adam(parameters, opt['lr'], weight_decay=opt['optimizer_weight_decay'])
     scheduler = th.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt['lr_scheduler_cosine_T_max'])
+    # チェックポイントがある場合、モデルの状態を読み込む　GPUが使用可能な場合モデルと損失関数をGPUに移動
     if opt['resume_checkpoint_path']:
         checkpoint = th.load(opt['resume_checkpoint_path'])
         gcn_encoder.load_state_dict(checkpoint['gcn_encoder'])
@@ -143,39 +186,49 @@ def train_model(opt, _run, _log):
     # Start Epochs
     max_acc = 0.0
     for i_epoch in range(opt['epoch']):
-        # Start Training
+        # 訓練モードに設定
         gcn_encoder.train()
         gptrnn_decoder.train()
         gcn_classifier.train()
         train_loss = []
         train_class_loss = []
         train_cov_loss = []
+        # ミニバッチ学習開始
         for i_batch, batch in enumerate(train_iter):
+            # オプティマイザのゼロ化
             optimizer.zero_grad()
+            # バッチ読み込み
             batched_graph, nid_mappings, labels, docids = batch
             batch_size = labels.shape[0]
             if opt['gpu']:
                 batched_graph = batched_graph.to('cuda:0')
                 labels = labels.cuda()
+            # GCNEncoderを使用してノードの埋め込みを計算　h:ノードの特徴量 hg:グラフ全体の特徴量
             h, hg = gcn_encoder(batched_graph)
+            # グラフ構造を生成　encoder_out:エンコーダの出力 adj_vecs:予測された隣接行列のベクトル
             pointer_argmaxs, cov_loss, encoder_out, adj_vecs = gptrnn_decoder(batched_graph, h, hg)
-            adj_matrix = convert_adj_vec_to_matrix(adj_vecs, add_self_loop=True)
-            generated_nodes_emb = th.matmul(pointer_argmaxs.transpose(1, 2), encoder_out)  # batch*seq_l*hid
+            adj_matrix = convert_adj_vec_to_matrix(adj_vecs, add_self_loop=True) # 予測された隣接行列のベクトル表現adj_vecsを行列形式に変換
+            generated_nodes_emb = th.matmul(pointer_argmaxs.transpose(1, 2), encoder_out)  # batch*seq_l*hid 生成されたグラフの各ノードの埋め込み表現generated_nodes_embを計算
+            # GraphClassfierを使用して予測を行う　各ノードの特徴量と予測された隣接行列が入力
             pred = gcn_classifier(generated_nodes_emb, adj_matrix)
-            class_loss = class_criterion(pred, labels)
+            # 損失の計算と逆伝播
+            class_loss = class_criterion(pred, labels) # クロスエントロピー損失
             loss = class_loss + lambda_cov_loss * cov_loss
             loss.backward()
+            # 勾配のクリッピング(勾配爆発を防ぐために閾値を越えたら正規化)
             nn.utils.clip_grad_norm_(parameters, max_norm=opt['clip_grad_norm'], norm_type=2)
+            # Adamによるパラメータの更新
             optimizer.step()
             train_loss.append(loss.item())
             train_class_loss.append(class_loss.item())
             train_cov_loss.append(cov_loss.item())
+        # 損失の記録
         avg_loss = sum(train_loss)/len(train_loss)
         _run.log_scalar("train.loss", avg_loss, i_epoch)
         _run.log_scalar("train.class_loss", sum(train_class_loss)/len(train_class_loss), i_epoch)
         _run.log_scalar("train.cov_loss", sum(train_cov_loss)/len(train_cov_loss), i_epoch)
         _log.info('[%s] epoch#%d train Done, avg loss=%.5f' % (time.ctime(), i_epoch, avg_loss))
-        # Start Validating
+        # Start Validating　検証モードに設定　基本的に訓練と同じだが、勾配の計算(逆伝播)とパラメータの更新は行わない
         gcn_encoder.eval()
         gptrnn_decoder.eval()
         gcn_classifier.eval()
@@ -211,6 +264,7 @@ def train_model(opt, _run, _log):
         _run.log_scalar("eval.acc", acc*100, i_epoch)
         _log.info('[%s] epoch#%d validation Done, avg loss=%.5f, acc=%.2f' % (time.ctime(), i_epoch,
                                                                               avg_loss, acc * 100))
+        # ウォームアップエポックの後、検証精度が改善されたらモデルを保存。検証精度が指定された数だけ改善されない場合訓練停止
         if i_epoch > opt['epoch_warmup']:
             if acc > max_acc:
                 max_acc = acc
@@ -227,6 +281,7 @@ def train_model(opt, _run, _log):
             if opt['early_stop_flag'] and patience > opt['patience']:
                 _log.info('Achieve best acc=%.2f, early stop at epoch #%d' % (max_acc*100, i_epoch))
                 exit(0)
+        # スケジューラを使用して学習率を調整。Gunbel-Softmaxパラメータと正則化損失の重みを減衰
         # scheduler
         scheduler.step()
         # Anneal gumbel-softmax tau

@@ -101,7 +101,9 @@ class DocClassificationDataset(Dataset):
 def collate_fn(data: list) -> tuple:
     # return map(list, zip(*data))
     graphs, batched_nid_mappings, batched_labels, docids = map(list, zip(*data))
+    # バッチ内の個々のグラフを一つのグラフに結合する
     batched_graph = dgl.batch(graphs)
+    # th.LongTensorはラベルのリストをLongTensor型に変換
     return batched_graph, batched_nid_mappings, th.LongTensor(batched_labels), docids
 
 
