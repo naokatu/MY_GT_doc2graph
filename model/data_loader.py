@@ -44,9 +44,9 @@ class DocClassificationDataset(Dataset):
             for idx, n in enumerate(nxg.nodes()):
                 nid_mapping[n] = idx
                 freqs.append(nxg.nodes[n]['freq'])
-                print(f'nodes = {nxg.nodes}')
-                print(f'nodes[n] = {nxg.nodes[n]}')
-                print(f'n = {n}')
+                # print(f'nodes = {nxg.nodes}')
+                # print(f'nodes[n] = {nxg.nodes[n]}')
+                # print(f'n = {n}')
                 loc_f.append(min([_[0] for _ in nxg.nodes[n]['offsets']]))
                 loc_l.append(max([_[1] for _ in nxg.nodes[n]['offsets']]))
                 for i, t in enumerate(n.split(' ')):
@@ -119,7 +119,7 @@ def get_vocab(train_graphs: list, val_graphs: list, pretrained_vec: torchtext.vo
         for n in G.nodes():
             if n is None:
                 continue
-            print(n)
+            # print(n)
             for word in n.split(' '):
                 if word in counter:
                     counter[word] += 1
@@ -183,8 +183,8 @@ if __name__ == '__main__':
     dblp_pickle_path = 'data/dblp.win5.pickle.gz'
     # prepare_ingredients(dblp_pickle_path)
     # nyt_pickle_path = 'data/nyt.win5.pickle.gz'
-    nyt_pickle_path = 'data/livedoor.win5.pickle.gz'
+    ja_pickle_path = 'data/livedoor.win5.pickle.gz'
     random.seed(27)
     # train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'nyt')
-    train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'ja')
+    train_set, val_set, test_set, vocab = prepare_ingredients(ja_pickle_path, 'ja')
     print(test_set.docids[:20])

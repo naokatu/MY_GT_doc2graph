@@ -12,25 +12,52 @@ import japanize_matplotlib
 import make_corpus_from_dataset
 import phrase_extraction_by_spacy
 
-def create_initial_graph(index, sentences, window_size: int = 4) -> nx.Graph:
+def create_initial_graph(num_category, index, sentences, window_size: int = 4) -> nx.Graph:
     G = nx.Graph()
 
-
     G.graph['docid'] = index
-    G.graph['class'] = random.randint(0, 4)
+    G.graph['class'] = num_category
 
-    print(len(sentences))
     nodes = []
+    noun_offsets_li = []
+    verb_offsets_li = []
+    adj_offsets_li = []
     for sentence in sentences:
-        noun_phrases = phrase_extraction_by_spacy.noun_phrases_extraction_by_spacy(sentence)
-        verb_phrases = phrase_extraction_by_spacy.verb_phrases_extract_by_spacy(sentence)
-        adj_phrases = phrase_extraction_by_spacy.adj_phrases_extraction_by_spacy(sentence)
+        noun_phrases, noun_offsets = phrase_extraction_by_spacy.noun_phrases_extraction_by_spacy(sentence)
+        verb_phrases, verb_offsets = phrase_extraction_by_spacy.verb_phrases_extract_by_spacy(sentence)
+        adj_phrases, adj_offsets = phrase_extraction_by_spacy.adj_phrases_extraction_by_spacy(sentence)
 
         # ノード追加
         nodes += noun_phrases + verb_phrases + adj_phrases
+        noun_offsets_li += noun_offsets
+        verb_offsets_li += verb_offsets
+        adj_offsets_li += adj_offsets
     # すべての文のnode追加
     for i in range(len(nodes)):
         G.add_node(nodes[i])
+        # 単語の出現頻度を計算
+        if 'freq' not in G.nodes[nodes[i]]:
+            G.nodes[nodes[i]]['freq'] = 1
+        else:
+            G.nodes[nodes[i]]['freq'] += 1
+
+        # 単語の出現位置を追加
+        # TODO:本当は各offsetsが空かどうか判定する必要あり
+        if len(noun_offsets_li) - 1 >= i:
+            if 'offsets' not in G.nodes[nodes[i]]:
+                G.nodes[nodes[i]]['offsets'] = [noun_offsets_li[i]]
+            else:
+                G.nodes[nodes[i]]['offsets'].append(noun_offsets_li[i])
+        elif len(noun_offsets_li) + len(verb_offsets_li) - 1 >= i:
+            if 'offsets' not in G.nodes[nodes[i]]:
+                G.nodes[nodes[i]]['offsets'] = [verb_offsets_li[i-len(noun_offsets_li)]]
+            else:
+                G.nodes[nodes[i]]['offsets'].append(verb_offsets_li[i-len(noun_offsets_li)])
+        else:
+            if 'offsets' not in G.nodes[nodes[i]]:
+                G.nodes[nodes[i]]['offsets'] = [adj_offsets_li[i-len(noun_offsets_li)-len(verb_offsets_li)]]
+            else:
+                G.nodes[nodes[i]]['offsets'].append(adj_offsets_li[i-len(noun_offsets_li)-len(verb_offsets_li)])
 
         if i >= 2:
             # sliding-windowの設定
@@ -69,11 +96,12 @@ def main():
     text = make_corpus_from_dataset.return_livedoor_text('https://www.rondhuit.com/download/ldcc-20140209.tar.gz',
                                                         'ldcc-20140209.tar.gz')
     graph_li = []
-    for category in text.values():
-        for index, content in enumerate(category):
+    print(text.keys()) # dict_keys(['text/it-life-hack', 'text/movie-enter', 'text/livedoor-homme', 'text/smax', 'text/topic-news', 'text/kaden-channel', 'text/sports-watch', 'text/dokujo-tsushin', 'text/peachy'])
+    for num_category, category in enumerate(text.keys()):
+        for index, content in enumerate(text[category]):
             doc = nlp(content)
             # doc.sentsは1文ずつのオブジェクト
-            file_init_graph = create_initial_graph(index, list(doc.sents))
+            file_init_graph = create_initial_graph(num_category, index, list(doc.sents))
             graph_li.append(file_init_graph)
     
     write_pickle(graph_li)

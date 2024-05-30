@@ -30,13 +30,13 @@ def my_config():
     opt = {
            'gpu': False,
            'seed': 27,
-           'corpus_type': '',    # 'yelp'|'dblp'|'nyt'
+           'corpus_type': 'ld',    # 'yelp'|'dblp'|'nyt'|'ld'
            'processed_pickle_path': '',
            'checkpoint_dir': '',
            'n_labels': {
                'nyt': 5,
                'yelp': 5,
-               'ja': 5,
+               'ja': 9,
                'yelp-3-class': 3,
                'dblp': 6
                },

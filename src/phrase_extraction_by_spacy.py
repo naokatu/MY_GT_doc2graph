@@ -5,37 +5,46 @@ def noun_phrases_extraction_by_spacy(doc) -> List[str]:
 
     # 名詞句の抽出　あまりに短い文章だと精度が落ちるかも
     noun_list = []
+    offset_list = []
     for chunk in doc.noun_chunks:
         noun_list.append(chunk.text)
+        offset_list.append((chunk.start_char, chunk.start_char + len(chunk.text) - 1))
 
-    return noun_list
+    return noun_list,offset_list
 
 def verb_phrases_extract_by_spacy(doc) -> List[str]:
 
     verb_phrases = []
+    offset_list = []
     for token in doc:
         # 動詞だったら
         if token.pos_ == 'VERB':
             verb_phrase = []
+            start_char = token.idx  # 動詞の開始位置を取得
+            end_char = start_char + len(token.text) - 1
 
             for child in token.children:
                 # 目的語があれば動詞の前にappend
                 if child.dep_ == 'obj' or child.dep_ == 'obl':
                     verb_phrase.append(child.text)
+                    start_char -= len(child.text)
             verb_phrase.append(token.text)
 
             for child in token.children:
                 # 動詞の後につづく補語的なものがあれば
                 if child.dep_ == 'aux':
                     verb_phrase.append(child.text)
+                    end_char += len(child.text) - 1
 
             verb_phrases.append(''.join(verb_phrase))
+            offset_list.append((start_char, end_char))
             
-    return verb_phrases
+    return verb_phrases, offset_list
 
 def adj_phrases_extraction_by_spacy(doc) -> List[str]:
 
     adj_phrases = []
+    offset_list = []
     for token in doc:
         # 前後のtokenを取得
         next_token = token.doc[token.i+1] if not token.is_sent_end else None
@@ -52,23 +61,28 @@ def adj_phrases_extraction_by_spacy(doc) -> List[str]:
             # 形容動詞 （形状詞 + な） ... 静かな
             if (token_tag == '形状詞') and (next_token.text == 'な'):
                 adj_phrases.append(token.text + 'な')
+                offset_list.append((token.idx, token.idx + len(token.text) + 1 - 1))
             # 名詞 + な  ... 元気な
             if (token_tag == '名詞') and (next_token.text == 'な'):
                 adj_phrases.append(token.text + 'な')
+                offset_list.append((token.idx, token.idx + len(token.text) + 1 - 1))
             # 動詞 + 形容詞的 ... わかりやすい, 怒りっぽい
             if is_next_token_tag and (token_tag == '動詞') and (next_token_tag_sub == '形容詞的'):
                 adj_phrases.append(token.text + next_token.text)
+                offset_list.append((token.idx, next_token.idx + len(next_token.text) - 1))
             # 単体の形容詞
             if token_tag == '形容詞':
                 adj_phrases.append(token.text)
+                offset_list.append((token.idx, token.idx + len(token.text) - 1))
 
         if prev_token is not None:
             prev_token_tag = prev_token.tag_.split('-')[0]
             # 名詞 + ない ... 問題ない, 仕方ない
             if is_token_tag and (prev_token_tag == '名詞') and (token_tag == '形容詞') and (token_tag_sub == '非自立可能'):
                 adj_phrases.append(prev_token.text + token.text)
+                offset_list.append(prev_token.idx, next_token.idx + len(next_token.text) - 1)
     
-    return adj_phrases
+    return adj_phrases, offset_list
 
 
 def main():
