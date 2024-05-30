@@ -22,27 +22,32 @@ from utils import convert_adj_vec_to_matrix
 from model.data_loader import prepare_ingredients, collate_fn
 from model.GPT_GRNN import GCNEncoder, GPTGRNNDecoder, GraphClassifier
 
-def visualize_graph(adj_matrix, node_features):
-    # グラフの作成
+def visualize_graph_with_text(batched_graph, pointer_argmax, adj_matrix):
+    print('グラフを表示させます')
+    nodes = th.argmax(pointer_argmax, dim=0)
+    print('ノードを取り出しました')
     G = nx.Graph()
     
-    # ノードの追加
-    num_nodes = adj_matrix.size(0)
-    for i in range(num_nodes):
-        G.add_node(i, features=node_features[i].detach().cpu().numpy())
-
-    # エッジの追加
-    for i in range(num_nodes):
-        for j in range(i + 1, num_nodes):
-            if adj_matrix[i, j] > 0:
-                G.add_edge(i, j, weight=adj_matrix[i, j].item())
-
-    # ノード位置の計算
-    pos = nx.spring_layout(G)
+    for node in nodes:
+        print(type(node))
+        G.add_node(int(node))
     
-    # グラフの描画
-    plt.figure(figsize=(8, 8))
-    nx.draw(G, pos, with_labels=True, node_size=500, node_color="skyblue", font_size=10, font_color="black", edge_color="gray")
+    for i, probability in enumerate(adj_matrix):
+        print('B')
+        filterd_pro_list = [value for value in probability if value != 1.0]
+
+        max_pro = max(filterd_pro_list)
+        probability = probability.tolist() # tensor -> list
+        max_index = probability.index(max_pro)
+        G.add_edge(int(nodes[i]), int(nodes[max_index]))
+    
+
+   # グラフの描画
+    pos = nx.spring_layout(G)
+    nx.draw_networkx(G, pos, with_labels=True, alpha=0.5, font_family='IPAexGothic')
+
+    # 表示
+    plt.axis("off")
     plt.show()
 
 '''
@@ -226,7 +231,6 @@ def train_model(opt, _run, _log):
             optimizer.zero_grad()
             # バッチ読み込み
             batched_graph, nid_mappings, labels, docids = batch
-            # print('A')
             # graph = dgl.unbatch(batched_graph)[0]
             # print('graph')
             # pprint(graph)
@@ -241,15 +245,9 @@ def train_model(opt, _run, _log):
             generated_nodes_emb = th.matmul(pointer_argmaxs.transpose(1, 2), encoder_out)  # batch*seq_l*hid 生成されたグラフの各ノードの埋め込み表現generated_nodes_embを計算
             # GraphClassfierを使用して予測を行う　各ノードの特徴量と予測された隣接行列が入力
             pred = gcn_classifier(generated_nodes_emb, adj_matrix)
-            en_size = encoder_out.size()
-            mat_size = adj_matrix.size()
-            print(f'{en_size[0]}*{en_size[1]}*{en_size[2]}')
-            print(f'{mat_size[0]}*{mat_size[1]}*{mat_size[2]}')
-            # visualize_graph(adj_matrix[0], generated_nodes_emb[0])
-            print('encoder_out')
-            pprint(encoder_out)
-            print('adj_matrix')
-            pprint(adj_matrix)
+            visualize_graph_with_text(dgl.unbatch(batched_graph)[0],pointer_argmaxs[0], adj_matrix[0])
+            print('graph')
+            print(dgl.unbatch(batched_graph)[0])
             # 損失の計算と逆伝播
             class_loss = class_criterion(pred, labels) # クロスエントロピー損失
             loss = class_loss + lambda_cov_loss * cov_loss
