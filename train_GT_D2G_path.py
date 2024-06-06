@@ -22,24 +22,27 @@ from utils import convert_adj_vec_to_matrix
 from model.data_loader import prepare_ingredients, collate_fn
 from model.GPT_GRNN import GCNEncoder, GPTGRNNDecoder, GraphClassifier
 
-def visualize_graph_with_text(batched_graph, pointer_argmax, adj_matrix):
+def visualize_graph_with_text(batched_graph, pointer_argmax, adj_matrix, nodes_text):
     print('グラフを表示させます')
-    nodes = th.argmax(pointer_argmax, dim=0)
+    nodes = th.argmax(pointer_argmax, dim=0) # 1の値のインデックスを取り出す
     print('ノードを取り出しました')
     G = nx.Graph()
+
+    nodes_text_li = list(nodes_text)
+    choice_nodes = []
     
     for node in nodes:
-        print(type(node))
-        G.add_node(int(node))
+        choice_nodes.append(nodes_text_li[int(node)])
+        G.add_node(nodes_text_li[int(node)])
     
+    # エッジの存在確率が最大の部分だけ接続
     for i, probability in enumerate(adj_matrix):
-        print('B')
         filterd_pro_list = [value for value in probability if value != 1.0]
 
         max_pro = max(filterd_pro_list)
         probability = probability.tolist() # tensor -> list
         max_index = probability.index(max_pro)
-        G.add_edge(int(nodes[i]), int(nodes[max_index]))
+        G.add_edge(choice_nodes[int(i)], choice_nodes[int(max_index)])
     
 
    # グラフの描画
@@ -230,7 +233,7 @@ def train_model(opt, _run, _log):
             # オプティマイザのゼロ化
             optimizer.zero_grad()
             # バッチ読み込み
-            batched_graph, nid_mappings, labels, docids = batch
+            batched_graph, nid_mappings, labels, docids, nodes = batch
             # graph = dgl.unbatch(batched_graph)[0]
             # print('graph')
             # pprint(graph)
@@ -245,9 +248,11 @@ def train_model(opt, _run, _log):
             generated_nodes_emb = th.matmul(pointer_argmaxs.transpose(1, 2), encoder_out)  # batch*seq_l*hid 生成されたグラフの各ノードの埋め込み表現generated_nodes_embを計算
             # GraphClassfierを使用して予測を行う　各ノードの特徴量と予測された隣接行列が入力
             pred = gcn_classifier(generated_nodes_emb, adj_matrix)
-            visualize_graph_with_text(dgl.unbatch(batched_graph)[0],pointer_argmaxs[0], adj_matrix[0])
-            print('graph')
-            print(dgl.unbatch(batched_graph)[0])
+            visualize_graph_with_text(dgl.unbatch(batched_graph)[0],pointer_argmaxs[0], adj_matrix[0], nodes[0])
+            # print('graph')
+            # print(dgl.unbatch(batched_graph)[0])
+            # print('nodes')
+            # print(len(nodes[0]))
             # 損失の計算と逆伝播
             class_loss = class_criterion(pred, labels) # クロスエントロピー損失
             loss = class_loss + lambda_cov_loss * cov_loss

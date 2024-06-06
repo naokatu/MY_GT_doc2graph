@@ -21,9 +21,11 @@ class DocClassificationDataset(Dataset):
         self.nid_mappings = []    # store mention to nid mapping
         self.labels = []          # store classification labels
         self.docids = []          # starts from 1
+        self.nodes = []
         epsilon = 1e-6     # avoid div zero
         for nxg in graphs:
             self.docids.append(nxg.graph['docid'])
+            self.nodes.append(nxg.nodes())
             if corpus_type == 'yelp':
                 self.labels.append(nxg.graph['class'] - 1)   # yelp 1-5
             elif corpus_type == 'dblp':
@@ -95,16 +97,16 @@ class DocClassificationDataset(Dataset):
         return len(self.graphs)
 
     def __getitem__(self, idx: int) -> tuple:
-        return self.graphs[idx], self.nid_mappings[idx], self.labels[idx], self.docids[idx]
+        return self.graphs[idx], self.nid_mappings[idx], self.labels[idx], self.docids[idx], self.nodes[idx]
 
 
 def collate_fn(data: list) -> tuple:
     # return map(list, zip(*data))
-    graphs, batched_nid_mappings, batched_labels, docids = map(list, zip(*data))
+    graphs, batched_nid_mappings, batched_labels, docids, nodes = map(list, zip(*data))
     # バッチ内の個々のグラフを一つのグラフに結合する
     batched_graph = dgl.batch(graphs)
     # th.LongTensorはラベルのリストをLongTensor型に変換
-    return batched_graph, batched_nid_mappings, th.LongTensor(batched_labels), docids
+    return batched_graph, batched_nid_mappings, th.LongTensor(batched_labels), docids, nodes
 
 
 def get_vocab(train_graphs: list, val_graphs: list, pretrained_vec: torchtext.vocab.Vectors,
@@ -182,9 +184,9 @@ def prepare_ingredients(pickle_path: str, corpus_type: str,
 if __name__ == '__main__':
     dblp_pickle_path = 'data/dblp.win5.pickle.gz'
     # prepare_ingredients(dblp_pickle_path)
-    # nyt_pickle_path = 'data/nyt.win5.pickle.gz'
+    nyt_pickle_path = 'data/nyt.win5.pickle.gz'
     ja_pickle_path = 'data/livedoor.win5.pickle.gz'
     random.seed(27)
-    # train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'nyt')
-    train_set, val_set, test_set, vocab = prepare_ingredients(ja_pickle_path, 'ja')
+    train_set, val_set, test_set, vocab = prepare_ingredients(nyt_pickle_path, 'nyt')
+    # train_set, val_set, test_set, vocab = prepare_ingredients(ja_pickle_path, 'ja')
     print(test_set.docids[:20])
