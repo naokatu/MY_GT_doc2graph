@@ -16,8 +16,8 @@ with open('../data/nyt.win5.pickle.gz', 'rb')as f:
 
 G = all_graphs[23]  # 最初のグラフを取得
 
-print(nx.number_of_nodes(G))
-print(nx.number_of_edges(G))
+# print(nx.number_of_nodes(G))
+# print(nx.number_of_edges(G))
 node_li = list(G.nodes)
 print(G.graph)
 print(*node_li)
