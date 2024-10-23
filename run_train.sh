@@ -26,21 +26,28 @@
 
 # Train GT-D2G-path
 # NYT
- python train_GT_D2G_path.py with 'motivation="GT-D2G-path"' \
-     'opt.gpu=True' 'opt.seed=27'\
-     'opt.pretrain_emb_dropout=0.5' 'opt.lambda_cov_loss=0.5'\
-     'opt.epoch=500' 'opt.epoch_warmup=5' 'opt.early_stop_flag=True'\
-     'opt.corpus_type="nyt"' 'opt.processed_pickle_path="data/nyt.win5.pickle.gz"' \
-     'opt.corpus_type="nyt"' 'opt.processed_pickle_path="data/nyt.win5.pickle.gz"' \
-     'opt.batch_size=128' 'opt.lr=3e-4' 'opt.optimizer_weight_decay=1e-4'\
-     'opt.checkpoint_dir="checkpoints/GT-D2G-path"'
+# python train_GT_D2G_path.py with 'motivation="GT-D2G-path"' \
+#     'opt.gpu=False' 'opt.seed=27'\
+#     'opt.pretrain_emb_dropout=0.5' 'opt.lambda_cov_loss=0.5'\
+#     'opt.epoch=500' 'opt.epoch_warmup=5' 'opt.early_stop_flag=True'\
+#     'opt.corpus_type="nyt"' 'opt.processed_pickle_path="data/nyt.win5.pickle.gz"' \
+#     'opt.corpus_type="nyt"' 'opt.processed_pickle_path="data/nyt.win5.pickle.gz"' \
+#     'opt.batch_size=128' 'opt.lr=3e-4' 'opt.optimizer_weight_decay=1e-4'\
+#     'opt.checkpoint_dir="checkpoints/GT-D2G-path"'
 
 
-#python train_GT_D2G_ja.py with 'motivation="GT-D2G-path"' \
-#    'opt.gpu=True' 'opt.seed=27'\
+#python train_GT_D2G_ja.py with 'motivation="GT-D2G-ja"' \
+#    'opt.gpu=False' 'opt.seed=28'\
 #    'opt.pretrain_emb_dropout=0.5' 'opt.lambda_cov_loss=0.5'\
 #    'opt.epoch=500' 'opt.epoch_warmup=5' 'opt.early_stop_flag=True'\
-#    'opt.corpus_type="ja"' 'opt.processed_pickle_path="data/livedoor.win5.pickle.gz"' \
-#    'opt.corpus_type="ja"' 'opt.processed_pickle_path="data/livedoor.win5.pickle.gz"' \
+#    'opt.corpus_type="ld"' 'opt.processed_pickle_path="data/livedoor.win5.pickle.gz"' \
 #    'opt.batch_size=128' 'opt.lr=3e-4' 'opt.optimizer_weight_decay=1e-4'\
 #    'opt.checkpoint_dir="checkpoints/GT-D2G-ja"'
+
+python train_GT_D2G_ja_MSE.py with 'motivation="GT-D2G-ja-pptx"' \
+    'opt.gpu=False' 'opt.seed=28'\
+    'opt.pretrain_emb_dropout=0.5' 'opt.lambda_cov_loss=0.5'\
+    'opt.epoch=250' 'opt.epoch_warmup=5' 'opt.early_stop_flag=True'\
+    'opt.corpus_type="pptx"' 'opt.processed_pickle_path="data/pptx.win5.pickle.gz"' \
+    'opt.batch_size=10' 'opt.lr=3e-4' 'opt.optimizer_weight_decay=1e-4'\
+    'opt.checkpoint_dir="checkpoints/GT-D2G-ja-pptx"'

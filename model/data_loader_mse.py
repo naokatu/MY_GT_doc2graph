@@ -23,11 +23,13 @@ class DocClassificationDataset(Dataset):
         self.docids = []          # starts from 1
         self.nodes = []
         self.filenames = []
+        self.ner = []
         epsilon = 1e-6     # avoid div zero
         for nxg in graphs:
             self.docids.append(nxg.graph['docid'])
             self.nodes.append(nxg.nodes())
             self.filenames.append(nxg.graph['filename'])
+            self.ner.append(nxg.graph['NER'])
             if corpus_type == 'yelp':
                 self.labels.append(nxg.graph['class'] - 1)   # yelp 1-5
             elif corpus_type == 'dblp':
@@ -104,16 +106,16 @@ class DocClassificationDataset(Dataset):
         return len(self.graphs)
 
     def __getitem__(self, idx: int) -> tuple:
-        return self.graphs[idx], self.nid_mappings[idx], self.labels[idx], self.docids[idx], self.nodes[idx], self.filenames[idx]
+        return self.graphs[idx], self.nid_mappings[idx], self.labels[idx], self.docids[idx], self.nodes[idx], self.filenames[idx], self.ner[idx]
 
 
 def collate_fn(data: list) -> tuple:
     # return map(list, zip(*data))
-    graphs, batched_nid_mappings, batched_labels, docids, nodes, filename = map(list, zip(*data))
+    graphs, batched_nid_mappings, batched_labels, docids, nodes, filename, ner = map(list, zip(*data))
     # バッチ内の個々のグラフを一つのグラフに結合する
     batched_graph = dgl.batch(graphs)
     # th.LongTensorはラベルのリストをLongTensor型に変換
-    return batched_graph, batched_nid_mappings, th.LongTensor(batched_labels), docids, nodes, filename
+    return batched_graph, batched_nid_mappings, th.LongTensor(batched_labels), docids, nodes, filename, ner
 
 
 def get_vocab(train_graphs: list, val_graphs: list, pretrained_vec: torchtext.vocab.Vectors,

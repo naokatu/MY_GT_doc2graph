@@ -16,7 +16,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import sacred
 
-from utils import convert_adj_vec_to_matrix, get_sequence_lens_by_pointers, mask_generated_graph
+from utils_new import convert_adj_vec_to_matrix, get_sequence_lens_by_pointers, mask_generated_graph
 from model.data_loader import prepare_ingredients, collate_fn
 from model.GPT_GRNN import GCNEncoder, GraphClassifier
 from model.GPT_GRNN import GPTGRNNDecoderS, GPTGRNNDecoder, GPTGRNNDecoderVariable
@@ -124,7 +124,7 @@ def test_model(config_path, checkpoint_path, gumbel_tau, _run, _log):
     all_gold = []
     with th.no_grad():
         for i_batch, batch in enumerate(test_iter):
-            batched_graph, nid_mappings, labels, docids = batch
+            batched_graph, nid_mappings, labels, docids, nodes, filename = batch
             batch_size = labels.shape[0]
             if opt['gpu']:
                 batched_graph = batched_graph.to('cuda:0')

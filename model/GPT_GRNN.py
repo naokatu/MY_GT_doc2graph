@@ -4,6 +4,7 @@ Author:
 Create Date: Nov 27, 2020
 """
 
+from pprint import pprint
 import math
 import dgl
 import dgl.function as fn
@@ -101,7 +102,7 @@ class GCNEncoder(nn.Module):
             neg_embs = self.neg_ee(g.ndata['neg'])   # nnodes*ee_dim
             h = th.cat((word_embs, g.ndata['f'].unsqueeze(1), g.ndata['lf'].unsqueeze(1),
                         g.ndata['ll'].unsqueeze(1), pos_embs, neg_embs), 1)  # nnodes*(emb_s+3+2*ee_dim)
-        
+
         h = F.relu(self.conv1(g, h))     # nnodes*gcn_h
         h = F.relu(self.conv2(g, h))     # nnodes*gcn_h
         hg = self.pooling(g, h)    # batch*gcn_h
@@ -276,8 +277,11 @@ class GraphClassifier(nn.Module):
     def forward(self, inputs, adj):
         output = F.relu(self.conv1(inputs, adj))
         output = F.relu(self.conv2(output, adj))  # batch*seq_len*hid
+        # print(f'output:{output.shape}')
         output = output.mean(dim=1)  # batch*hid
+        # print(f'output_mean:{output.shape}')
         output = self.mlp(output)
+        # print(f'output_mlp:{output.shape}')
         return output
 
 
@@ -417,7 +421,7 @@ class GPTGRNNDecoder(nn.Module):
         # シーケンスの長さに基づいてマスクを生成　シーケンスの有効な部分を1，パディングされた部分を0とする
         # マスクはAttension機構、損失関数の計算において有効な部分だけを使用するために使われる
         mask = get_mask_from_sequence_lengths(g.batch_num_nodes(), g.batch_num_nodes().max())
-        # パディングを追加 エンコーダの出力（デコーダの入力）を取得
+        # パディングを追加 エンコーダの出力（デコーダの入力）を取得 グラフによってノード数が違うためノード数が最大のものに合わせる　これでバッチ処理ができる？
         encoder_out = pad_sequence(pseduo_seqs, batch_first=True)  # batch*max_nnode*hi
         batch_size = encoder_out.shape[0]
         decoder_input = encoder_out.new_zeros((batch_size, self.input_size)).unsqueeze(1)   # batch*1*input

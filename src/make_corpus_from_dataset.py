@@ -56,4 +56,4 @@ def return_livedoor_text(url: str, filename: str) -> Dict[str, List[Any]]:
 
             text_li[target_dir].append(content)
 
-        return text_li
+    return text_li

@@ -12,7 +12,7 @@ import japanize_matplotlib
 import make_corpus_from_dataset
 import phrase_extraction_by_spacy
 
-def create_initial_graph(num_category, index, sentences, window_size: int = 4) -> nx.Graph:
+def create_initial_graph(num_category, index, sentences, window_size: int = 2) -> nx.Graph:
     G = nx.Graph()
 
     G.graph['docid'] = index
@@ -61,7 +61,7 @@ def create_initial_graph(num_category, index, sentences, window_size: int = 4) -
 
         if i >= 2:
             # sliding-windowの設定
-            sliding_window_list = more_itertools.windowed(nodes,window_size,step = 3)
+            sliding_window_list = more_itertools.windowed(nodes,window_size,step = 1)
             # すべての組み合わせでエッジ接続
             for window in sliding_window_list:
                 for comb_nodes in itertools.combinations(window, 2):
@@ -98,6 +98,7 @@ def main():
     graph_li = []
     print(text.keys()) # dict_keys(['text/it-life-hack', 'text/movie-enter', 'text/livedoor-homme', 'text/smax', 'text/topic-news', 'text/kaden-channel', 'text/sports-watch', 'text/dokujo-tsushin', 'text/peachy'])
     for num_category, category in enumerate(text.keys()):
+        print(category)
         for index, content in enumerate(text[category]):
             doc = nlp(content)
             # doc.sentsは1文ずつのオブジェクト

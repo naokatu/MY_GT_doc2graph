@@ -18,7 +18,7 @@ from sacred.observers import FileStorageObserver
 import japanize_matplotlib
 
 from utils import convert_adj_vec_to_matrix
-from model.data_loader import prepare_ingredients, collate_fn
+from model.data_loader_mse import prepare_ingredients, collate_fn
 from model.GPT_GRNN import GCNEncoder, GPTGRNNDecoder, GraphClassifier
 import dgl
 import os
@@ -28,7 +28,17 @@ import os
 ex = sacred.Experiment('train_GT-D2G-ja')
 ex.observers.append(FileStorageObserver("logs/GT-D2G-ja-pptx"))
 
+def count_ner(pointer_argmax, nodes_text, ner_li):
+    nodes = th.argmax(pointer_argmax, dim=0)  # 1の値のインデックスを取り出す
 
+    nodes_text_li = list(nodes_text)
+
+    count = 0
+    for node in nodes:
+        if nodes_text_li[int(node)] in ner_li:
+            count += 1
+
+    return th.tensor(count)
 def visualize_graph_with_text(seed, pointer_argmax, adj_matrix, nodes_text, i_epoch, i_batch, docid, filename, mode):
     nodes = th.argmax(pointer_argmax, dim=0)  # 1の値のインデックスを取り出す
     G = nx.Graph()
@@ -47,7 +57,6 @@ def visualize_graph_with_text(seed, pointer_argmax, adj_matrix, nodes_text, i_ep
         max_pro = max(filterd_pro_list)
         probability = probability.tolist()  # tensor -> list
         max_index = probability.index(max_pro)
-        # 存在確率が0.6以上の場合のみエッジを張る（このせいで学習初期はエッジが張られない場合が多々ある）
         if max_pro.item() > 0.6:
             G.add_edge(choice_nodes[int(i)], choice_nodes[int(max_index)])
 
@@ -163,6 +172,7 @@ def train_model(opt, _run, _log):
     gcn_classifier = GraphClassifier(opt['gcn_encoder_hidden_size'], opt['gcn_classifier_hidden_size'],
                                      n_labels)
     class_criterion = nn.CrossEntropyLoss()
+    class_mse = nn.MSELoss()
     parameters = list(gcn_encoder.parameters()) + list(gptrnn_decoder.parameters()) \
         + list(gcn_classifier.parameters())
     optimizer = th.optim.Adam(parameters, opt['lr'], weight_decay=opt['optimizer_weight_decay'])
@@ -193,7 +203,7 @@ def train_model(opt, _run, _log):
         all_train_gold = []
         for i_batch, batch in enumerate(train_iter):
             optimizer.zero_grad()
-            batched_graph, nid_mappings, labels, docids, nodes, filenames = batch
+            batched_graph, nid_mappings, labels, docids, nodes, filenames, ner = batch
             batch_size = labels.shape[0]
             if opt['gpu']:
                 batched_graph = batched_graph.to('cuda:0')
@@ -203,16 +213,28 @@ def train_model(opt, _run, _log):
             adj_matrix = convert_adj_vec_to_matrix(adj_vecs, add_self_loop=True)
             generated_nodes_emb = th.matmul(pointer_argmaxs.transpose(1, 2), encoder_out)  # batch*seq_l*hid
             pred = gcn_classifier(generated_nodes_emb, adj_matrix)
+            # 専門用語の出現回数をカウント
+            ner_count_all = th.tensor([])
+            for i in range(len(pointer_argmaxs)):
+                ner_count = count_ner(pointer_argmaxs[i], nodes[i], ner[i])
+                ner_count_all = th.cat([ner_count_all, th.tensor([ner_count])])
+
             if i_epoch == 0 or i_epoch == 5 or i_epoch == 10 or i_epoch == 100 or i_epoch == 240 or i_epoch == 250 or i_epoch == 260 or i_epoch == 300:
                 for i in range(len(pointer_argmaxs)):
+
+
                     if i < len(pointer_argmaxs) and i < len(adj_matrix) and i < len(nodes) and i < len(docids):
                         visualize_graph_with_text(opt['seed'], pointer_argmaxs[i], adj_matrix[i], nodes[i],
                                               i_epoch, i_batch, docids[i], filenames[i], 'train')
                     else:
                         _log.info('Index {%d} is out!' % i)
-
+            # 実際の専門用語の出現回数
+            y_ner_count_all = list(map(len, ner))
+            y_ner_count_all = th.LongTensor(y_ner_count_all)
+            # 専門用語の回数を損失として扱う
+            class_mse_loss = class_mse(ner_count_all, y_ner_count_all)
             class_loss = class_criterion(pred, labels)
-            loss = class_loss + lambda_cov_loss * cov_loss
+            loss = class_loss + class_mse_loss + lambda_cov_loss * cov_loss
             loss.backward()
             nn.utils.clip_grad_norm_(parameters, max_norm=opt['clip_grad_norm'], norm_type=2)
             optimizer.step()
@@ -239,7 +261,7 @@ def train_model(opt, _run, _log):
         all_gold = []
         with th.no_grad():
             for i_batch, batch in enumerate(val_iter):
-                batched_graph, nid_mappings, labels, docids, nodes, filenames  = batch
+                batched_graph, nid_mappings, labels, docids, nodes, filenames,ner  = batch
                 batch_size = labels.shape[0]
                 if opt['gpu']:
                     batched_graph = batched_graph.to('cuda:0')
@@ -249,6 +271,11 @@ def train_model(opt, _run, _log):
                 adj_matrix = convert_adj_vec_to_matrix(adj_vecs, add_self_loop=True)
                 generated_nodes_emb = th.matmul(pointer_argmaxs.transpose(1, 2), encoder_out)  # batch*seq_l*hid
                 pred = gcn_classifier(generated_nodes_emb, adj_matrix)
+                # 専門用語の出現回数をカウント
+                ner_count_all = th.tensor([])
+                for i in range(len(pointer_argmaxs)):
+                    ner_count = count_ner(pointer_argmaxs[i], nodes[i], ner[i])
+                    ner_count_all = th.cat([ner_count_all, th.tensor([ner_count])])
                 if i_epoch == 0 or i_epoch == 5 or i_epoch == 200 or i_epoch == 250:
                     for i in range(len(pointer_argmaxs)):
                         if i < len(pointer_argmaxs) and i < len(adj_matrix) and i < len(nodes) and i < len(docids):
@@ -256,8 +283,14 @@ def train_model(opt, _run, _log):
                                                       i_epoch, i_batch, docids[i], filenames[i], 'val')
                         else:
                             _log.info('Index {%d} is out!' % i)
+
+                # 実際の専門用語の出現回数
+                y_ner_count_all = list(map(len, ner))
+                y_ner_count_all = th.LongTensor(y_ner_count_all)
+                # 専門用語の回数を損失として扱う
+                class_mse_loss = class_mse(ner_count_all, y_ner_count_all)
                 class_loss = class_criterion(pred, labels)
-                loss = class_loss + lambda_cov_loss * cov_loss
+                loss = class_loss + class_mse_loss + lambda_cov_loss * cov_loss
                 val_loss.append(loss.item())
                 val_class_loss.append(class_loss.item())
                 val_cov_loss.append(cov_loss.item())

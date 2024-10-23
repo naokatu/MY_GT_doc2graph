@@ -31,5 +31,13 @@
 # python test_GT_D2G.py with 'config_path="checkpoints/GT-D2G-path/dblp_seed27.best.config"' \
 #      'checkpoint_path="checkpoints/GT-D2G-path/dblp_seed27.best.ckpt"'
 # Reproduce Yelp Result
-python test_GT_D2G.py with 'config_path="checkpoints/GT-D2G-path/yelp_seed27.best.config"' \
-     'checkpoint_path="checkpoints/GT-D2G-path/yelp_seed27.best.ckpt"'
+#python test_GT_D2G.py with 'config_path="checkpoints/GT-D2G-path/yelp_seed27.best.config"' \
+#     'checkpoint_path="checkpoints/GT-D2G-path/yelp_seed27.best.ckpt"'
+
+# japanese
+#python test_GT_D2G.py with 'config_path="checkpoints/GT-D2G-ja/exp17_ja.best.config"' \
+#     'checkpoint_path="checkpoints/GT-D2G-ja/exp24_ja.best.ckpt"'
+
+# pptx
+python test_GT_D2G.py with 'config_path="checkpoints/GT-D2G-ja-pptx/exp2_pptx.best.config"' \
+     'checkpoint_path="checkpoints/GT-D2G-ja-pptx/exp2_pptx.best.ckpt"'
